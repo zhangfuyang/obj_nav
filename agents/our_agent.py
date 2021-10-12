@@ -69,6 +69,9 @@ class Our_Agent(habitat.RLEnv):
         else:
             self.region_semantic_info = None
 
+        # used for choosing one shortest path when using gt agent
+        self.gt_shortest_path = None
+
     def reset(self):
         """
         Returns:
@@ -98,9 +101,16 @@ class Our_Agent(habitat.RLEnv):
 
         ### set obs
         obs = super().reset()
+
+        # set shortest_path for gt agent
+        if self.args.agent_type == 'gt':
+            shortest_paths = self.current_episode.shortest_paths
+            self.gt_shortest_path = random.choice(shortest_paths)
+
         # preprocessing depth
-        for i in range(obs['depth'].shape[1]):
-            obs['depth'][:, i][obs['depth'][:, i] == 0.] = obs['depth'][:, i].max()
+        #for i in range(obs['depth'].shape[1]):
+        #    obs['depth'][:, i][obs['depth'][:, i] == 0.] = obs['depth'][:, i].max()
+
         # process obj semantic
         if self.args.use_gt_obj:
             raw_semantic = obs['semantic']
@@ -186,7 +196,8 @@ class Our_Agent(habitat.RLEnv):
         if self.args.agent_type == 'random':
             action = {'action': random.randint(0, 3)}
         elif self.args.agent_type == 'gt':
-            pass
+            action = self.gt_shortest_path[self.timestep].action
+            action = {'action': 0 if action is None else action}
         else:
             action = {'action': action}
             # model

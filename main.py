@@ -6,6 +6,9 @@ import torch
 import numpy as np
 from envs.habitat import construct_envs
 from arguments import get_args
+from constants import coco_categories
+import matplotlib.pyplot as plt
+import cv2
 
 os.environ["OMP_NUM_THREADS"] = "1"
 
@@ -26,6 +29,10 @@ def main():
     # Starting environments
     envs = construct_envs(args)
     obs, infos = envs.reset()
+    obs, infos = envs.reset()
+    obs, infos = envs.reset()
+    obs, infos = envs.reset()
+    obs, infos = envs.reset()
 
     finished = np.zeros((args.num_processes))
     for step in range(args.num_training_frames // args.num_processes + 1):
@@ -41,6 +48,14 @@ def main():
                 obs_r, info_r = envs.reset_at(e)[0]
                 obs[e] = obs_r
                 infos[e] = info_r
+                print('reset')
+
+        #vis = obs[0, :3].transpose(1,2,0).astype(np.uint8)
+        #vis = vis[..., ::-1]
+        #obj_semantic_one_hot = obs[0, 4:4+len(coco_categories)]
+        #cv2.imshow(infos[0]['goal_name'], img[...,::-1])
+        #cv2.waitKey(1)
+
         # ------------------------------------------------------------------
 
 
