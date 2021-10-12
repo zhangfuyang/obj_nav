@@ -1,0 +1,31 @@
+bathroom: 330
+bedroom: 252
+closet: 103
+dining room: 70
+entryway/foyer/lobby: 65
+familyroom: 61
+garage: 14
+hallway: 350
+library: 2
+laundryroom: 35
+kitchen: 78
+living room: 71
+meetingroom: 25
+lounge: 70
+office: 98
+porch/terrace/deck/driveway: 85
+rec/game: 17
+stairs: 168
+toilet: 37
+utilityroom/toolroom: 16
+tv: 13
+workout/gym/exercise: 16
+outdoor areas: 19
+balcony: 51
+other room: 84
+bar: 3
+classroom: 2
+dining booth: 5
+spa/sauna: 44
+junk: 22
+no label: 0

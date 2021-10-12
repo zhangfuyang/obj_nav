@@ -1,0 +1,24 @@
+{
+	'table': 337131, 
+	'chair': 545293, 
+	'picture': 135163, 
+	'cabinet': 213887, 
+	'chest_of_drawers': 104915, 
+	'stool': 82165, 
+	'counter': 69853, 
+	'sink': 115331, 
+	'tv_monitor': 20677, 
+	'clothes': 17170, 
+	'sofa': 78947, 
+	'plant': 116657, 
+	'seating': 67205, 
+	'bed': 97150, 
+	'cushion': 363213, 
+	'shower': 57437, 
+	'towel': 83044, 
+	'toilet': 66693, 
+	'bathtub': 29019, 
+	'gym_equipment': 7610, 
+	'fireplace': 23862
+}
+
