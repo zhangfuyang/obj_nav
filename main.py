@@ -34,14 +34,13 @@ def main():
 
         step_time = time.time()
         obs, reward, done, infos = envs.step([{'action': 0} for _ in range(args.num_processes)])
-        print('fps:', 1 / (time.time() - step_time))
+        print('main step fps: {:.2f}'.format(1 / (time.time() - step_time)))
 
         for e, x in enumerate(done):
             if x:
                 obs_r, info_r = envs.reset_at(e)[0]
                 obs[e] = obs_r
                 infos[e] = info_r
-                print('reset')
         # ------------------------------------------------------------------
 
 

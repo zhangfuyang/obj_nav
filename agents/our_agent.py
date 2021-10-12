@@ -181,7 +181,7 @@ class Our_Agent(habitat.RLEnv):
             done (bool):
             info (dict): contains timestep, pose, goal category, etc
         """
-        start_time = time.time()
+        thread_step_time = time.time()
         assert self.stopped is False
         if self.args.agent_type == 'random':
             action = {'action': random.randint(0, 3)}
@@ -193,7 +193,9 @@ class Our_Agent(habitat.RLEnv):
             pass
         if action['action'] == 0:
             self.stopped = True
+        inner_step_time = time.time()
         obs, rew, done, _ = super().step(action)
+        print('Thread {}, inner step fps:{:.2f}'.format(self.rank, 1/(time.time() - inner_step_time)))
         #preprocessing depth
         #for i in range(obs['depth'].shape[1]):
         #    obs['depth'][:, i][obs['depth'][:, i] == 0.] = obs['depth'][:, i].max()
@@ -230,7 +232,7 @@ class Our_Agent(habitat.RLEnv):
 
         features_name = ['rgb', 'depth', 'obj_semantic', 'region_semantic']
         obs_concat = np.concatenate([obs[name] for name in features_name], axis=2).transpose(2,0,1)
-        print('inner fps:', 1/(time.time() - start_time))
+        print('Thread {}, step fps:{:.2f}'.format(self.rank, 1/(time.time() - thread_step_time)))
 
 
         return obs_concat, rew, done, self.info
