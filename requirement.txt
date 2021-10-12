@@ -1,0 +1,4 @@
+habitat == 0.2.1
+habitat-sim == 0.2.1
+pytorch == 1.6.0
+
