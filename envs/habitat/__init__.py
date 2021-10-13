@@ -55,7 +55,6 @@ def construct_envs(args):
             split=args.split), "content")
         scenes = _get_scenes_from_folder(content_dir)
 
-    scenes = scenes[1:5]
     if len(scenes) > 0:
         assert len(scenes) >= args.num_processes, (
             "reduce the number of processes as there "

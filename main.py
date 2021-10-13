@@ -28,6 +28,7 @@ def main():
 
     # Starting environments
     envs = construct_envs(args)
+    obs, infos = envs.reset()
 
     finished = np.zeros((args.num_processes))
     for step in range(args.num_training_frames // args.num_processes + 1):
