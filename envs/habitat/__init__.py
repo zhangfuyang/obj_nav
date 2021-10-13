@@ -3,9 +3,9 @@
 import os
 import numpy as np
 import torch
+import habitat
 from habitat.config.default import get_config as cfg_env
-from habitat.datasets.pointnav.pointnav_dataset import PointNavDatasetV1
-from habitat import make_dataset, VectorEnv
+from habitat import make_dataset
 
 from agents.our_agent import Our_Agent
 
@@ -131,7 +131,8 @@ def construct_envs(args):
 
         args_list.append(args)
 
-    envs = VectorEnv(
+    VectorEnvClass = habitat.VectorEnv if args.num_processes > 1 else VectorSingleEnv
+    envs = VectorEnvClass(
         make_env_fn=make_env_fn,
         env_fn_args=tuple(
             tuple(
@@ -141,3 +142,80 @@ def construct_envs(args):
     )
 
     return envs
+
+
+class VectorSingleEnv(habitat.VectorEnv):
+    r"""VectorEnv with single Env on main Process, avoiding IPC overheads."""
+
+    def __init__(
+        self,
+        make_env_fn,
+        env_fn_args = None,
+        auto_reset_done = True,
+        multiprocessing_start_method = "forkserver",
+        workers_ignore_signals = False,
+    ):
+        self._num_envs = len(env_fn_args)
+        assert (self._num_envs == 1), "can only create 1 env"
+        self._auto_reset_done = auto_reset_done
+        self._is_closed = True
+        self._env = make_env_fn(*env_fn_args[0])
+        self._is_closed = False
+        self._paused = []
+
+        self.observation_spaces = [self._env.observation_space]
+        self.action_spaces = [self._env.action_space]
+        self.number_of_episodes = [self._env.number_of_episodes]
+
+    def current_episodes(self):
+        return [self._env.current_episode]
+
+    def count_episodes(self):
+        return [self._env.number_of_episodes]
+
+    def episode_over(self):
+        return [self._env.episode_over]
+
+    def get_metrics(self):
+        return [self._env.get_metrics()]
+
+    def reset(self):
+        return [self._env.reset()]
+
+    def reset_at(self, index):
+        assert (index == 0), "only valid for a single env"
+        return [self._env.reset()]
+
+    def step(self, data):
+        action = data[0]
+        if isinstance(action, (int, np.integer, str)):
+            action = {"action": {"action": action}}
+        observations, reward, done, info = self._env.step(**action)
+        if self._auto_reset_done and done:
+            observations = self._env.reset()
+        return [(observations, reward, done, info)]
+
+    def close(self):
+        if self._is_closed:
+            return
+        self._env.close()
+        self._is_closed = True
+
+    def pause_at(self, index):
+        self._paused = [index]  # TODO: hacky no-op for now
+
+    def resume_all(self):
+        self._paused = []  # TODO: hacky no-op for now
+
+    def render(self, mode = "human", *args, **kwargs):
+        images = self._env.render(args)  # TODO: actually test this code path
+        tile = habitat.core.utils.tile_images(images)
+        if mode == "human":
+            cv2 = habitat.core.utils.try_cv2_import()
+            cv2.imshow("vecenv", tile[:, :, ::-1])
+            cv2.waitKey(1)
+            return None
+        elif mode == "rgb_array":
+            return tile
+        else:
+            raise NotImplementedError
