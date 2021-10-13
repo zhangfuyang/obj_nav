@@ -28,15 +28,19 @@ def main():
 
     # Starting environments
     envs = construct_envs(args)
-    obs, infos = envs.reset()
-
+    x = envs.reset()
+    obs, infos = zip(*x)
+    obs = np.stack(obs)
+    infos = list(infos)
     finished = np.zeros((args.num_processes))
     for step in range(args.num_training_frames // args.num_processes + 1):
         if finished.sum() == args.num_processes:
             break
 
         step_time = time.time()
-        obs, reward, done, infos = envs.step([{'action': 0} for _ in range(args.num_processes)])
+        x = envs.step([{'action': 0} for _ in range(args.num_processes)])
+        obs, rews, dones, infos = zip(*x)
+        obs, reward, done, infos = np.stack(obs), np.stack(rews), np.stack(dones), list(infos)
         print('main step fps: {:.2f}'.format(1 / (time.time() - step_time)))
 
         for e, x in enumerate(done):

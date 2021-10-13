@@ -5,11 +5,10 @@ import numpy as np
 import torch
 from habitat.config.default import get_config as cfg_env
 from habitat.datasets.pointnav.pointnav_dataset import PointNavDatasetV1
-from habitat import Config, Env, RLEnv, VectorEnv, make_dataset
+from habitat import make_dataset, VectorEnv
 
 from agents.our_agent import Our_Agent
 
-from .utils.vector_env import VectorEnv
 
 
 def make_env_fn(args, config_env, rank):
