@@ -10,7 +10,6 @@ from habitat import make_dataset
 from agents.our_agent import Our_Agent
 
 
-
 def make_env_fn(args, config_env, rank):
     dataset = make_dataset(config_env.DATASET.TYPE, config=config_env.DATASET)
     config_env.defrost()
@@ -219,3 +218,22 @@ class VectorSingleEnv(habitat.VectorEnv):
             return tile
         else:
             raise NotImplementedError
+
+
+class EnvWrap():
+    def __init__(self, envs):
+        self._envs = envs
+
+    def reset(self):
+        x = self._envs.reset()
+        obs, infos = zip(*x)
+        return np.stack(obs), list(infos)
+
+    def step(self, actions):
+        x = self._envs.step(actions)
+        obs, rews, dones, infos = zip(*x)
+        return np.stack(obs), np.stack(rews), np.stack(dones), list(infos)
+
+    def reset_at(self, idx):
+        x = self._envs.reset_at(idx)
+        return x

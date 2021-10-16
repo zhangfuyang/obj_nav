@@ -4,7 +4,7 @@ import json
 import gym
 import torch
 import numpy as np
-from envs.habitat import construct_envs
+from envs.habitat import construct_envs, EnvWrap
 from arguments import get_args
 from constants import coco_categories
 import matplotlib.pyplot as plt
@@ -28,19 +28,16 @@ def main():
 
     # Starting environments
     envs = construct_envs(args)
-    x = envs.reset()
-    obs, infos = zip(*x)
-    obs = np.stack(obs)
-    infos = list(infos)
+    envs = EnvWrap(envs)
+    obs, infos = envs.reset()
     finished = np.zeros((args.num_processes))
     for step in range(args.num_training_frames // args.num_processes + 1):
         if finished.sum() == args.num_processes:
             break
 
         step_time = time.time()
-        x = envs.step([{'action': 0} for _ in range(args.num_processes)])
-        obs, rews, dones, infos = zip(*x)
-        obs, reward, done, infos = np.stack(obs), np.stack(rews), np.stack(dones), list(infos)
+        obs, reward, done, infos = \
+            envs.step([{'action': 0} for _ in range(args.num_processes)])
         print('main step fps: {:.2f}'.format(1 / (time.time() - step_time)))
 
         for e, x in enumerate(done):

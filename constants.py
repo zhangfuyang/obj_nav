@@ -54,7 +54,8 @@ category2objectid = {
     'towel': 16,
     'toilet': 17,
     'bathtub': 18,
-    'gym_equipment': 19
+    'gym_equipment': 19,
+    'fireplace': 20
 }
 objid_mp3did = [ # (obj_id, mp3d_id)
     (0, 5),
@@ -77,6 +78,7 @@ objid_mp3did = [ # (obj_id, mp3d_id)
     (17, 18),
     (18, 25),
     (19, 33),
+    (20, 27)
 ]
 
 #all mp3d
