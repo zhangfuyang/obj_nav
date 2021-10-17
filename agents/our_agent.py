@@ -13,6 +13,7 @@ import matplotlib.path as mpltPath
 import time
 import envs.utils.pose as pu
 
+
 class Our_Agent(habitat.RLEnv):
     def __init__(self, args, rank, config_env, dataset):
         self.args = args
@@ -90,7 +91,6 @@ class Our_Agent(habitat.RLEnv):
         self.stopped = False
         self.path_length = 1e-5
         self.trajectory_states = []
-        self.last_sim_location = self.get_sim_location()
 
         # store gt if needed
         if self.gt_annotation is not None:
@@ -101,6 +101,7 @@ class Our_Agent(habitat.RLEnv):
 
         ### set obs
         obs = super().reset()
+        self.last_sim_location = self.get_sim_location()
 
         # set shortest_path for gt agent
         if self.args.agent_type == 'gt':
@@ -112,62 +113,73 @@ class Our_Agent(habitat.RLEnv):
         #    obs['depth'][:, i][obs['depth'][:, i] == 0.] = obs['depth'][:, i].max()
 
         # process obj semantic
-        if self.args.use_gt_obj:
-            raw_semantic = obs['semantic']
-            # TODO save into file, read from file
-            if new_scene:
-                # update mapping if first time in this scene
-                scene = self.habitat_env.sim.semantic_annotations()
-                instance_id_to_label_id = {int(obj.id.split("_")[-1]): obj.category.index() for obj in scene.objects}
-                self.mapping = np.array([ instance_id_to_label_id[i] for i in range(len(instance_id_to_label_id)) ])
-            obj_semantic = np.take(self.mapping, raw_semantic)
-            depth = obs['depth'][:,:,0]
-            obj_semantic[depth > self.args.max_gt_obj] = -1 # too far, set to -1
-            H, W = obs['depth'].shape[0], obs['depth'].shape[1]
-            obs['obj_semantic'] = np.zeros((H, W,
-                                            len(category2objectid.keys())))
-            for (obj_idx, mp3d_id) in objid_mp3did:
-                obs['obj_semantic'][..., obj_idx] = obj_semantic == mp3d_id
-        else:
-            #TODO use maskrcnn
-            H, W = obs['depth'].shape[0], obs['depth'].shape[1]
-            obs['obj_semantic'] = np.zeros((H,W,len(category2objectid.keys())))
+        if self.args.use_obj:
+            if self.args.use_gt_obj:
+                raw_semantic = obs['semantic']
+                # TODO save into file, read from file
+                if new_scene:
+                    # update mapping if first time in this scene
+                    scene = self.habitat_env.sim.semantic_annotations()
+                    instance_id_to_label_id = {int(obj.id.split("_")[-1]): obj.category.index() for obj in scene.objects}
+                    self.mapping = np.array([ instance_id_to_label_id[i] for i in range(len(instance_id_to_label_id)) ])
+                # remove noise obj
+                remove_id = np.unique(raw_semantic[obs['depth'][...,0] < 0.3])
+                mapping = self.mapping.copy()
+                mapping[remove_id] = -1
+
+                obj_semantic = np.take(mapping, raw_semantic)
+                depth = obs['depth'][:,:,0]
+                obj_semantic[depth > self.args.max_gt_obj] = -1 # too far, set to -1
+                H, W = obs['depth'].shape[0], obs['depth'].shape[1]
+                obs['obj_semantic'] = np.zeros((H, W,
+                                                len(category2objectid.keys())))
+                for (obj_idx, mp3d_id) in objid_mp3did:
+                    obs['obj_semantic'][..., obj_idx] = obj_semantic == mp3d_id
+            else:
+                #TODO use maskrcnn
+                H, W = obs['depth'].shape[0], obs['depth'].shape[1]
+                obs['obj_semantic'] = np.zeros((H,W,len(category2objectid.keys())))
         # process region semantic
-        if self.args.use_gt_region:
-            ### initialize this new episode
-            agent_sim_loc = self.habitat_env.sim.get_agent_state(0).position
-            agent_sim_rot = self.habitat_env.sim.get_agent_state(0).rotation
-            initial_pos = np.array((-agent_sim_loc[2], -agent_sim_loc[0]))
-            initial_axis = quaternion.as_euler_angles(agent_sim_rot)[0]
-            agent_pose_m_np = np.zeros(3)
-            agent_pose_m_np[0] = self.args.map_size_cm / 100. / 2
-            agent_pose_m_np[1] = self.args.map_size_cm / 100. / 2
-            initial_info = {'agent_sim_loc': agent_sim_loc, 'agent_sim_rot': agent_sim_rot,
-                            'initial_pos': initial_pos, 'initial_axis': initial_axis,
-                            'agent_pose_m_np': agent_pose_m_np}
-            self.region_semantic_info['initial_info'] = initial_info
-            #TODO cache
-            gt_regions_coord = self.get_regions_in_one_level() # get all the region in the same level
-            H = W = self.args.map_size_cm // self.args.map_resolution
-            gt_region_mask = np.zeros((H, W)) ## gt_region_mask is the mask for calculate region segmantation
-            for (region_cm, region_type_id) in gt_regions_coord:
-                if region_type_id == 0:
-                    continue
-                polygon = (region_cm * 100. / self.args.map_resolution).astype(np.int)
-                gt_region_mask = cv2.drawContours(gt_region_mask, [polygon], 0,
-                                                  region_type_id, -1)
-                # TODO fix small hole and undefined place
-            self.region_semantic_info['gt_region_mask'] = gt_region_mask
-            ### finish initialization
+        if self.args.use_region:
+            if self.args.use_gt_region:
+                ### initialize this new episode
+                agent_sim_loc = self.habitat_env.sim.get_agent_state(0).position
+                agent_sim_rot = self.habitat_env.sim.get_agent_state(0).rotation
+                initial_pos = np.array((-agent_sim_loc[2], -agent_sim_loc[0]))
+                initial_axis = quaternion.as_euler_angles(agent_sim_rot)[0]
+                agent_pose_m_np = np.zeros(3)
+                agent_pose_m_np[0] = self.args.map_size_cm / 100. / 2
+                agent_pose_m_np[1] = self.args.map_size_cm / 100. / 2
+                initial_info = {'agent_sim_loc': agent_sim_loc, 'agent_sim_rot': agent_sim_rot,
+                                'initial_pos': initial_pos, 'initial_axis': initial_axis,
+                                'agent_pose_m_np': agent_pose_m_np}
+                self.region_semantic_info['initial_info'] = initial_info
+                #TODO cache
+                gt_regions_coord = self.get_regions_in_one_level() # get all the region in the same level
+                H = W = self.args.map_size_cm // self.args.map_resolution
+                gt_region_mask = np.zeros((H, W)) ## gt_region_mask is the mask for calculate region segmantation
+                for (region_cm, region_type_id) in gt_regions_coord:
+                    if region_type_id == 0:
+                        continue
+                    polygon = (region_cm * 100. / self.args.map_resolution).astype(np.int)
+                    gt_region_mask = cv2.drawContours(gt_region_mask, [polygon], 0,
+                                                      region_type_id, -1)
+                    # TODO fix small hole and undefined place
+                self.region_semantic_info['gt_region_mask'] = gt_region_mask
+                ### finish initialization
 
-            xyz = self.depth2point(obs['depth'])
-            obs['region_semantic'] = self.point2region_semantic(xyz)
-        else:
-            # TODO use prediction regions
-            H, W = obs['depth'].shape[0], obs['depth'].shape[1]
-            obs['region_semantic'] = np.zeros((H, W, len(mp3d_region_id2name.keys())))
+                xyz = self.depth2point(obs['depth'])
+                obs['region_semantic'] = self.point2region_semantic(xyz)
+            else:
+                # TODO use prediction regions
+                H, W = obs['depth'].shape[0], obs['depth'].shape[1]
+                obs['region_semantic'] = np.zeros((H, W, len(mp3d_region_id2name.keys())))
 
-        features_name = ['rgb', 'depth', 'obj_semantic', 'region_semantic']
+        features_name = ['rgb', 'depth']
+        if self.args.use_obj:
+            features_name += ['obj_semantic']
+        if self.args.use_region:
+            features_name += ['region_semantic']
         obs_concat = np.concatenate([obs[name] for name in features_name], axis=2).transpose(2,0,1)
 
         ### set info
@@ -218,33 +230,43 @@ class Our_Agent(habitat.RLEnv):
         self.path_length += pu.get_l2_distance(0, dx, 0, dy)
 
         # process obj semantic
-        if self.args.use_gt_obj:
-            raw_semantic = obs['semantic']
-            obj_semantic = np.take(self.mapping, raw_semantic)
-            depth = obs['depth'][:,:,0]
-            obj_semantic[depth > self.args.max_gt_obj] = -1 # too far
-            H, W = obs['depth'].shape[0], obs['depth'].shape[1]
-            obs['obj_semantic'] = np.zeros((H, W,
-                                            len(category2objectid.keys())))
-            for (obj_idx, mp3d_id) in objid_mp3did:
-                obs['obj_semantic'][..., obj_idx] = obj_semantic == mp3d_id
-        else:
-            #TODO use maskrcnn
-            H, W = obs['depth'].shape[0], obs['depth'].shape[1]
-            obs['obj_semantic'] = np.zeros((H,W,len(category2objectid.keys())))
-        # process region semantic
-        if self.args.use_gt_region:
-            xyz = self.depth2point(obs['depth'])
-            obs['region_semantic'] = self.point2region_semantic(xyz)
-        else:
-            # TODO use prediction regions
-            H, W = obs['depth'].shape[0], obs['depth'].shape[1]
-            obs['region_semantic'] = np.zeros((H, W, len(mp3d_region_id2name.keys())))
+        if self.args.use_obj:
+            if self.args.use_gt_obj:
+                raw_semantic = obs['semantic']
+                # remove noise obj
+                remove_id = np.unique(raw_semantic[obs['depth'][...,0] < 0.3])
+                mapping = self.mapping.copy()
+                mapping[remove_id] = -1
 
-        features_name = ['rgb', 'depth', 'obj_semantic', 'region_semantic']
+                obj_semantic = np.take(mapping, raw_semantic)
+                depth = obs['depth'][:,:,0]
+                obj_semantic[depth > self.args.max_gt_obj] = -1 # too far
+                H, W = obs['depth'].shape[0], obs['depth'].shape[1]
+                obs['obj_semantic'] = np.zeros((H, W,
+                                                len(category2objectid.keys())))
+                for (obj_idx, mp3d_id) in objid_mp3did:
+                    obs['obj_semantic'][..., obj_idx] = obj_semantic == mp3d_id
+            else:
+                #TODO use maskrcnn
+                H, W = obs['depth'].shape[0], obs['depth'].shape[1]
+                obs['obj_semantic'] = np.zeros((H,W,len(category2objectid.keys())))
+        # process region semantic
+        if self.args.use_region:
+            if self.args.use_gt_region:
+                xyz = self.depth2point(obs['depth'])
+                obs['region_semantic'] = self.point2region_semantic(xyz)
+            else:
+                # TODO use prediction regions
+                H, W = obs['depth'].shape[0], obs['depth'].shape[1]
+                obs['region_semantic'] = np.zeros((H, W, len(mp3d_region_id2name.keys())))
+
+        features_name = ['rgb', 'depth']
+        if self.args.use_obj:
+            features_name += ['obj_semantic']
+        if self.args.use_region:
+            features_name += ['region_semantic']
         obs_concat = np.concatenate([obs[name] for name in features_name], axis=2).transpose(2,0,1)
         print('Thread {}, step fps:{:.2f}'.format(self.rank, 1/(time.time() - thread_step_time)))
-
 
         return obs_concat, rew, done, self.info
 

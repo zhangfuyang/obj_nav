@@ -91,12 +91,14 @@ def get_args():
                         help="max distance to goal during training in meters")
     parser.add_argument('--version', type=str, default="v1",
                         help="dataset version")
+    parser.add_argument('--use_obj', type=int, default=1, help="use object detection")
     parser.add_argument('--use_gt_obj', type=int, default=1,
-                        help="use ground truth object detection")
+                        help="use ground truth object detection, only when --use_obj is 1")
     parser.add_argument('--max_gt_obj', type=float, default=10.0,
-                        help="when --use_gt_obj is true, set maximum visible distance in meters")
+                        help="when --use_gt_obj & --use_obj are 1, set maximum visible distance in meters")
+    parser.add_argument('--use_region', type=int, default=1, help="use region detection")
     parser.add_argument('--use_gt_region', type=int, default=1,
-                        help="use ground truth region detection")
+                        help="use ground truth region detection, only when --use_region is 1")
 
     # Model Hyperparameters
     parser.add_argument('--lr', type=float, default=2.5e-5,

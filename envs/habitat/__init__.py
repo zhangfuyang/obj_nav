@@ -221,19 +221,24 @@ class VectorSingleEnv(habitat.VectorEnv):
 
 
 class EnvWrap():
-    def __init__(self, envs):
+    def __init__(self, envs, device):
         self._envs = envs
+        self._device = device
 
     def reset(self):
         x = self._envs.reset()
         obs, infos = zip(*x)
-        return np.stack(obs), list(infos)
+        return torch.from_numpy(np.stack(obs)).float().to(self._device), list(infos)
 
     def step(self, actions):
         x = self._envs.step(actions)
         obs, rews, dones, infos = zip(*x)
-        return np.stack(obs), np.stack(rews), np.stack(dones), list(infos)
+        return torch.from_numpy(np.stack(obs)).float().to(self._device), \
+               torch.from_numpy(np.stack(rews)).float().to(self._device),\
+               torch.from_numpy(np.stack(dones)).float().to(self._device),\
+               list(infos)
 
     def reset_at(self, idx):
-        x = self._envs.reset_at(idx)
-        return x
+        x = self._envs.reset_at(idx)[0]
+        obs, info = x
+        return torch.from_numpy(obs).float().to(self._device), info
