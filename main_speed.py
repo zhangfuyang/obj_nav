@@ -104,10 +104,8 @@ class Our_Agent_speed(habitat.RLEnv):
     def reset(self):
         self.stopped = False
         obs = super().reset()
-        features_name = ['rgb', 'depth']
-        obs_concat = np.concatenate([obs[name] for name in features_name], axis=2).transpose(2,0,1)
 
-        return obs_concat, self.info
+        return obs, self.info
 
     def step(self, action):
         thread_step_time = time.time()
@@ -118,11 +116,9 @@ class Our_Agent_speed(habitat.RLEnv):
         inner_step_time = time.time()
         obs, rew, done, _ = super().step(action)
         print('Thread {}, inner step fps:{:.2f}'.format(self.rank, 1/(time.time() - inner_step_time)))
-        features_name = ['rgb', 'depth']
-        obs_concat = np.concatenate([obs[name] for name in features_name], axis=2).transpose(2,0,1)
         print('Thread {}, step fps:{:.2f}'.format(self.rank, 1/(time.time() - thread_step_time)))
 
-        return obs_concat, rew, done, self.info
+        return obs, rew, done, self.info
 
     def get_info(self, observation):
         """This function is not used, Habitat-RLEnv requires this function"""
