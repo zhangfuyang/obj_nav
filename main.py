@@ -10,6 +10,7 @@ from constants import category2objectid, mp3d_region_id2name
 import matplotlib.pyplot as plt
 import cv2
 from sem_map import Semantic_Mapping
+from vis_utils import visualization
 
 os.environ["OMP_NUM_THREADS"] = "1"
 
@@ -93,7 +94,6 @@ def main():
 
         semantic_map = semantic_map_module(obs, semantic_map, agent_pose_m)
 
-
         for e, x in enumerate(done):
             if x:
                 obs_r, info_r = envs.reset_at(e)
@@ -101,45 +101,22 @@ def main():
                 infos[e] = info_r
                 print('reset')
 
-        vis = obs[0, :3].transpose(1,2,0).astype(np.uint8)
-        vis = vis[..., ::-1]
-        vis = np.concatenate((vis, np.zeros((vis.shape[0], 5, 3)).astype(np.uint8)), 1)
-        obj_semantic_one_hot = obs[0, 4:4+len(category2objectid)]
-        color_palette = np.array([
-            (255, 179, 0), (128, 62, 117), (255, 104, 0),
-            (166, 189, 215), (193, 0, 32), (206, 162, 98),
-            (129, 112, 102), (0, 125, 52), (246, 118, 142),
-            (0, 83, 138), (255, 122, 92), (83, 55, 122),
-            (255, 142, 0), (179, 40, 81), (244, 200, 0),
-            (127, 24, 13), (147, 170, 0), (89, 51, 21),
-            (241, 58, 19), (35, 44, 22), (255, 255, 255)
-        ])
-        color_palette = color_palette[:, ::-1]
-        object_mask = np.zeros((obj_semantic_one_hot.shape[1], obj_semantic_one_hot.shape[2], 3))
-        for object_i in range(obj_semantic_one_hot.shape[0]):
-            object_mask += color_palette[object_i][np.newaxis, np.newaxis, ...] * obj_semantic_one_hot[object_i][..., np.newaxis]
-        vis = np.concatenate((vis, object_mask.astype(np.uint8)), 1)
+                # reset agent_pose_m
+                agent_pose_m[e, 0] = args.map_size_cm / 100 / 2
+                agent_pose_m[e, 1] = args.map_size_cm / 100 / 2
 
-        depth = obs[0, 3]
+                # reset semantic map
+                semantic_map[e] = 0
+                # set initial agent location in semantic_map
+                initial_r, initial_l = semantic_map.shape[2] // 2, semantic_map.shape[3] // 2
+                semantic_map[e, 2:4, initial_r-1:initial_r+2, initial_l-1:initial_l+2] = 1.0
+                semantic_map[e] = semantic_map_module(obs[e:e+1], semantic_map[e:e+1], agent_pose_m[e:e+1])[0]
 
-        vis = np.concatenate((vis, np.ones((60, vis.shape[1], 3), dtype=np.uint8)), 0)
-
-        x_loc = 20
-        for idx, region_type_name in enumerate(category2objectid.keys()):
-            cv2.putText(vis, str(idx),
-                        (x_loc, vis.shape[0]-10),
-                        fontFace=cv2.FONT_HERSHEY_SIMPLEX, fontScale=0.5, color=(255,255,255),
-                        thickness=1)
-            cv2.rectangle(vis, (x_loc, vis.shape[0]-40),
-                          (x_loc+20, vis.shape[0]-30),
-                          (color_palette[idx]).astype(np.uint).tolist(),
-                          thickness=-1)
-            x_loc += 60
-
-        cv2.imshow("vis", vis)
-        cv2.waitKey(1)
-        plt.imshow(depth)
-        plt.show()
+        for e in range(num_scenes):
+            img = obs[e,:3].cpu().numpy().transpose(1,2,0)[...,::-1].astype(np.uint8)
+            visualization(title='Thread {}'.format(e), goal_name=infos[e]['goal_name'],
+                          img=img, semantic_map=semantic_map[e],
+                          agent_pose_m=agent_pose_m[e], arg=args)
 
         # ------------------------------------------------------------------
 

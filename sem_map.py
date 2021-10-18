@@ -89,10 +89,12 @@ class Semantic_Mapping(nn.Module):
                                      XYZ_cm_std.shape[1],
                                      XYZ_cm_std.shape[2] * XYZ_cm_std.shape[3])
 
-        self.feat[:, 1:, :] = obs[:, 4:, :, :].view(bs, c-4, -1)
+        feat = self.feat[:bs]
+        init_grid = self.init_grid[:bs]
+        feat[:, 1:, :] = obs[:, 4:, :, :].view(bs, c-4, -1)
 
         voxels = du.splat_feat_nd(
-            self.init_grid * 0., self.feat, XYZ_cm_std).transpose(2, 3)
+                init_grid * 0., self.feat, XYZ_cm_std).transpose(2, 3)
 
         min_z = int(25 / z_resolution - min_h)
         max_z = int((self.agent_height + 1) / z_resolution - min_h)
