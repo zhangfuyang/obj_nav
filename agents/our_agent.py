@@ -25,12 +25,6 @@ class Our_Agent(habitat.RLEnv):
         self.episodes_dir = config_env.DATASET.EPISODES_DIR.format(
             split=self.split)
 
-        # initialize transform for RGB observations
-        self.res = transforms.Compose(
-            [transforms.ToPILImage(),
-             transforms.Resize((args.frame_height, args.frame_width),
-                               interpolation=Image.NEAREST)])
-
         # initialize semantic segmentation prediction model
         if self.args.use_gt_obj == 0:
             #TODO add semantic model
