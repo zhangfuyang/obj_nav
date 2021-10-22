@@ -27,12 +27,14 @@ def visualization(img, semantic_map=None, agent_pose_m=None, arg=None, title="vi
     if type(agent_pose_m) == torch.Tensor:
         agent_pose_m = agent_pose_m.detach().cpu().numpy()
 
-    # initial visualization of semantic map
-    vis_semantic_map = np.zeros((semantic_map.shape[1], semantic_map.shape[2], 3))
+    # draw explored map
+    vis_semantic_map = (semantic_map[1] >= 0.1)[..., np.newaxis] * \
+                       np.array((242., 242., 242.))[np.newaxis, np.newaxis, ...] # render obstacle
 
     # draw obstacle map
-    vis_semantic_map += (semantic_map[0] >= 0.1)[..., np.newaxis] * \
-                       np.array((153, 153, 153))[np.newaxis, np.newaxis, ...] # render obstacle
+    place = np.where(semantic_map[0] >= 0.1)
+    vis_semantic_map[place[0], place[1]] = 152. # render obstacle
+
 
     ####  start: draw agent arrow ####
     agent_loc = agent_pose_m[:2] * 100. / arg.map_resolution
@@ -87,6 +89,7 @@ def visualization(img, semantic_map=None, agent_pose_m=None, arg=None, title="vi
         combine_feat.append(vis_semantic_map)
 
     vis_semantic_map = np.concatenate(combine_feat, 1)
+    vis_semantic_map = np.flipud(vis_semantic_map)
 
     ####   end: draw semantic map ####
 

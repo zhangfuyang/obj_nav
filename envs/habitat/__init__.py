@@ -109,7 +109,7 @@ def construct_envs(args):
         config_env.SIMULATOR.DEPTH_SENSOR.MIN_DEPTH = args.min_depth
         config_env.SIMULATOR.DEPTH_SENSOR.MAX_DEPTH = args.max_depth
         config_env.SIMULATOR.DEPTH_SENSOR.POSITION = [0, args.camera_height, 0]
-        config_env.SIMULATOR.DEPTH_SENSOR.NORMALIZE_DEPTH = False
+        config_env.SIMULATOR.DEPTH_SENSOR.NORMALIZE_DEPTH = True
 
         if args.use_gt_obj:
             config_env.SIMULATOR.SEMANTIC_SENSOR.WIDTH = args.frame_width

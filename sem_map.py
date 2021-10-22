@@ -5,6 +5,7 @@ import numpy as np
 import depth_utils as du
 from constants import category2objectid, mp3d_region_id2name
 
+
 class Semantic_Mapping(nn.Module):
 
     """
@@ -52,12 +53,12 @@ class Semantic_Mapping(nn.Module):
         bs = obs.shape[0]
         c = obs.shape[1]
         depth = obs[:, 3]
-        ### depth preprocessing
-        for i in range(depth.shape[1]):
-            depth[:, i][depth[:, i] == 0.] = depth[:, i].max()
 
-        depth = depth * 100.
-        ### end
+        mask2 = depth > 0.99
+        depth[mask2] = 0.
+        mask1 = depth == 0
+        depth[mask1] = 100
+        depth = self.args.min_depth * 100.0 + depth * self.args.max_depth * 100.0
 
         #TODO if the depth is too small, don't use the detection results.
         # X is positive going right; Y is positive into the image; Z is positive up in the image
@@ -146,13 +147,13 @@ class Semantic_Mapping(nn.Module):
         map_pred, _ = torch.max(maps2, 1)
 
         # update agent location
-        # dim 2: past agent location
-        # dim 3: current agent location
-        map_pred[:, 2] = map_pred[:, 3]
+        # dim 2: current agent location
+        # dim 3: past agent location
+        map_pred[:, 3] = map_pred[:, 2]
         curr_loc = poses[:, :2] * 100 / self.args.map_resolution
         curr_loc = curr_loc.int()
         for scene_i in range(map_pred.shape[0]):
             r, c = curr_loc[scene_i, 1], curr_loc[scene_i, 0]
-            map_pred[scene_i, 3, r-1:r+2, c-1:c+2] = 1.0
+            map_pred[scene_i, 2, r-1:r+2, c-1:c+2] = 1.0
 
         return map_pred

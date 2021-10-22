@@ -78,10 +78,43 @@ def main():
     envs = EnvWrap(envs, device)
     obs, infos = envs.reset()
     semantic_map = semantic_map_module(obs, semantic_map, agent_pose_m)
+
+    for e in range(num_scenes):
+        img = obs[e,:3].cpu().numpy().transpose(1,2,0)[...,::-1].astype(np.uint8)
+        visualization(title='Thread {}'.format(e), goal_name=infos[e]['goal_name'],
+                      img=img, semantic_map=semantic_map[e],
+                      agent_pose_m=agent_pose_m[e], arg=args)
+
     for step in range(args.num_training_frames // args.num_processes + 1):
         step_time = time.time()
-        obs, reward, done, infos = \
-            envs.step([{'action': 0} for _ in range(args.num_processes)])
+        if args.agent_type != 'model':
+            obs, reward, done, infos = \
+                envs.step([{'action': 0, } for _ in range(args.num_processes)])
+        else:
+            # use action to pass info
+            real_target = []
+            goal_map = []
+            for i in range(args.num_processes):
+                obj_map = semantic_map[i, infos[i]['goal_cat_id'] + 4].cpu().numpy()
+                print(obj_map.sum())
+                if obj_map.sum() <= 0:
+                    real_target.append(False)
+                    target_map = np.zeros_like(obj_map)
+                    target_map[0:10,0:10] = 1
+                    #target_map[np.random.randint(obj_map.shape[0]),
+                    #           np.random.randint(obj_map.shape[1])] = 1
+                    goal_map.append(target_map)
+                else:
+                    goal_map.append(obj_map)
+                    real_target.append(True)
+            obs, reward, done, infos = \
+                envs.step([{'action': {
+                    'obstacle_map': semantic_map[i,0].cpu().numpy(),
+                    'goal_map': goal_map[i],
+                    'pose_m': agent_pose_m[i].cpu().numpy(),
+                    'real_target': real_target[i]}
+                } for i in range(args.num_processes)])
+
         print('main step fps: {:.2f}'.format(1 / (time.time() - step_time)))
 
         # accumulate agent pose

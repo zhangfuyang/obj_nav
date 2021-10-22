@@ -16,7 +16,7 @@ def get_args():
                         help="""how many training processes to use (default:5)
                                 Overridden when auto_gpu_config=1
                                 and training on gpus""")
-    parser.add_argument('--num_processes_per_gpu', type=int, default=1)
+    parser.add_argument('--num_processes_per_gpu', type=int, default=2)
     parser.add_argument('--num_processes_on_first_gpu', type=int, default=1)
     parser.add_argument('--eval', type=int, default=0,
                         help='0: Train, 1: Evaluate (default: 0)')
@@ -77,7 +77,7 @@ def get_args():
                         help="horizontal field of view in degrees")
     parser.add_argument('--turn_angle', type=float, default=30,
                         help="Agent turn angle in degrees")
-    parser.add_argument('--min_depth', type=float, default=0.1,
+    parser.add_argument('--min_depth', type=float, default=0.5,
                         help="Minimum depth for depth sensor in meters")
     parser.add_argument('--max_depth', type=float, default=5.0,
                         help="Maximum depth for depth sensor in meters")

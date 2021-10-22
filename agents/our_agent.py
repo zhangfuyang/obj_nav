@@ -12,6 +12,10 @@ import random
 import matplotlib.path as mpltPath
 import time
 import envs.utils.pose as pu
+import skimage.morphology
+from fmm_planner import FMMPlanner
+import math
+import matplotlib.pyplot as plt
 
 
 class Our_Agent(habitat.RLEnv):
@@ -59,6 +63,10 @@ class Our_Agent(habitat.RLEnv):
             self.gt_annotation = {} # annotation
         else:
             self.gt_annotation = None
+        if self.args.use_gt_obj and self.args.use_obj:
+            H, W = args.frame_height, args.frame_width
+            self.obj_semantic_extract_pattern = \
+                np.array([t[1] for t in objid_mp3did])[np.newaxis, np.newaxis, ...] * np.ones((H,W,1))
         if self.args.use_gt_region:
             self.region_semantic_info = {} # use for get region semantic information
         else:
@@ -66,6 +74,17 @@ class Our_Agent(habitat.RLEnv):
 
         # used for choosing one shortest path when using gt agent
         self.gt_shortest_path = None
+
+        # heuristic action
+        self.selem = skimage.morphology.disk(3)
+        self.last_action = -1
+        self.col_width = 1 # used for labeling the collision place
+        map_size = args.map_size_cm // args.map_resolution
+        self.collision_map = np.zeros((map_size, map_size))
+        self.visited = np.zeros((map_size, map_size))
+        self.prev_pos_m = np.zeros(3)
+        self.prev_pos_m[0] = args.map_size_cm / 100 / 2
+        self.prev_pos_m[1] = args.map_size_cm / 100 / 2
 
     def reset(self):
         """
@@ -103,8 +122,8 @@ class Our_Agent(habitat.RLEnv):
             self.gt_shortest_path = random.choice(shortest_paths)
 
         # preprocessing depth
-        #for i in range(obs['depth'].shape[1]):
-        #    obs['depth'][:, i][obs['depth'][:, i] == 0.] = obs['depth'][:, i].max()
+        for i in range(obs['depth'].shape[1]):
+            obs['depth'][:, i, 0][obs['depth'][:, i, 0] == 0.] = obs['depth'][:, i, 0].max()
 
         # process obj semantic
         if self.args.use_obj:
@@ -124,11 +143,8 @@ class Our_Agent(habitat.RLEnv):
                 obj_semantic = np.take(mapping, raw_semantic)
                 depth = obs['depth'][:,:,0]
                 obj_semantic[depth > self.args.max_gt_obj] = -1 # too far, set to -1
-                H, W = obs['depth'].shape[0], obs['depth'].shape[1]
-                obs['obj_semantic'] = np.zeros((H, W,
-                                                len(category2objectid.keys())))
-                for (obj_idx, mp3d_id) in objid_mp3did:
-                    obs['obj_semantic'][..., obj_idx] = obj_semantic == mp3d_id
+                obs['obj_semantic'] = (
+                        self.obj_semantic_extract_pattern == obj_semantic[..., np.newaxis]).astype(np.float)
             else:
                 #TODO use maskrcnn
                 H, W = obs['depth'].shape[0], obs['depth'].shape[1]
@@ -184,6 +200,15 @@ class Our_Agent(habitat.RLEnv):
         self.info['scene_name'] = self.current_episode.scene_id
         self.info['episode_id'] = self.current_episode.episode_id
 
+        ### reset heuristic action
+        self.last_action = -1
+        self.col_width = 1
+        self.collision_map[:] = 0
+        self.visited[:] = 0
+        self.prev_pos_m[0] = self.args.map_size_cm / 100 / 2
+        self.prev_pos_m[1] = self.args.map_size_cm / 100 / 2
+        self.prev_pos_m[2] = 0
+
         return obs_concat, self.info
 
     def step(self, action):
@@ -205,21 +230,26 @@ class Our_Agent(habitat.RLEnv):
             action = self.gt_shortest_path[self.timestep].action
             action = {'action': 0 if action is None else action}
         else:
-            action = {'action': action}
+            obstacle_map, goal_map, pose_m, real_target = \
+                action['obstacle_map'], action['goal_map'], action['pose_m'], action['real_target']
+            action = {'action': self._plan(obstacle_map, goal_map, pose_m, real_target)}
             # model
             pass
         if action['action'] == 0:
             self.stopped = True
         inner_step_time = time.time()
-        obs, rew, done, _ = super().step(action)
+        self.last_sim_location = self.get_sim_location()
+        obs, rew, done, super_info = super().step(action)
+        for key in super_info.keys():
+            self.info[key] = super_info[key]
         print('Thread {}, inner step fps:{:.2f}'.format(self.rank, 1/(time.time() - inner_step_time)))
         #preprocessing depth
-        #for i in range(obs['depth'].shape[1]):
-        #    obs['depth'][:, i][obs['depth'][:, i] == 0.] = obs['depth'][:, i].max()
+        for i in range(obs['depth'].shape[1]):
+            obs['depth'][:, i][obs['depth'][:, i] == 0.] = obs['depth'][:, i].max()
 
         self.timestep += 1
         self.trajectory_states.append(action)
-        dx, dy, do = self.get_pose_change() # also change self.last_sim_location to current location
+        dx, dy, do = self.get_pose_change()
         self.info['sensor_pose'] = [dx, dy, do]
         self.path_length += pu.get_l2_distance(0, dx, 0, dy)
 
@@ -235,11 +265,9 @@ class Our_Agent(habitat.RLEnv):
                 obj_semantic = np.take(mapping, raw_semantic)
                 depth = obs['depth'][:,:,0]
                 obj_semantic[depth > self.args.max_gt_obj] = -1 # too far
-                H, W = obs['depth'].shape[0], obs['depth'].shape[1]
-                obs['obj_semantic'] = np.zeros((H, W,
-                                                len(category2objectid.keys())))
-                for (obj_idx, mp3d_id) in objid_mp3did:
-                    obs['obj_semantic'][..., obj_idx] = obj_semantic == mp3d_id
+
+                obs['obj_semantic'] = (
+                        self.obj_semantic_extract_pattern == obj_semantic[..., np.newaxis]).astype(np.float)
             else:
                 #TODO use maskrcnn
                 H, W = obs['depth'].shape[0], obs['depth'].shape[1]
@@ -265,9 +293,7 @@ class Our_Agent(habitat.RLEnv):
         return obs_concat, rew, done, self.info
 
     def get_info(self, observation):
-        """This function is not used, Habitat-RLEnv requires this function"""
-        info = {}
-        return info
+        return self.habitat_env.get_metrics()
 
     def get_done(self, observation):
         if self.timestep >= self.args.max_episode_length - 1:
@@ -291,7 +317,6 @@ class Our_Agent(habitat.RLEnv):
         curr_sim_pose = self.get_sim_location()
         dx, dy, do = pu.get_rel_pose_change(
             curr_sim_pose, self.last_sim_location)
-        self.last_sim_location = curr_sim_pose
         return dx, dy, do
 
     def get_sim_location(self):
@@ -455,3 +480,104 @@ class Our_Agent(habitat.RLEnv):
         xyz[1] = -xyz[1]
 
         return xyz
+
+    def _plan(self, obstacle_map, goal_map, pose_m, real_target):
+        obstacle = np.rint(obstacle_map)
+        start_x, start_y, start_o = pose_m
+        start_x = int(start_x * 100 / self.args.map_resolution)
+        start_y = int(start_y * 100 / self.args.map_resolution)
+        start_y, start_x = pu.threshold_poses([start_x, start_y], obstacle_map.shape) # switch x<->y
+
+        self.visited[start_x, start_y] = 1
+
+        # collision check
+        if self.last_action == 1:
+            last_sim_loc = self.prev_pos_m
+            curr_sim_loc = pose_m
+
+            x1, y1, t1 = last_sim_loc
+            x2, y2, _ = curr_sim_loc
+            buf = 4
+            length = 2
+
+            if abs(x1 - x2) < 0.05 and abs(y1 - y2) < 0.05:
+                self.col_width += 2
+                if self.col_width == 7:
+                    length = 4
+                    buf = 3
+                self.col_width = min(self.col_width, 5)
+            else:
+                self.col_width = 1
+
+            dist = pu.get_l2_distance(x1, x2, y1, y2)
+            if dist < self.args.collision_threshold:  # Collision
+                width = self.col_width
+                for i in range(length):
+                    for j in range(width):
+                        wx = x1 + 0.05 * \
+                             ((i + buf) * np.cos(np.deg2rad(t1))
+                              + (j - width // 2) * np.sin(np.deg2rad(t1)))
+                        wy = y1 + 0.05 * \
+                             ((i + buf) * np.sin(np.deg2rad(t1))
+                              - (j - width // 2) * np.cos(np.deg2rad(t1)))
+                        r, c = wy, wx
+                        r, c = int(r * 100 / self.args.map_resolution), \
+                               int(c * 100 / self.args.map_resolution)
+                        [r, c] = pu.threshold_poses([r, c],
+                                                    self.collision_map.shape)
+                        self.collision_map[r, c] = 1
+
+        def add_boundary(mat, value=1):
+            h, w = mat.shape
+            new_mat = np.zeros((h + 2, w + 2)) + value
+            new_mat[1:h + 1, 1:w + 1] = mat
+            return new_mat
+
+        #plt.imshow(obstacle)
+        #plt.show()
+
+        traversible = skimage.morphology.binary_dilation(obstacle, self.selem) != True
+        traversible[self.collision_map==1] = 0
+        traversible[self.visited == 1] = 1 # mark visited loc as traversible
+        traversible[int(start_x)-1:int(start_x)+2, int(start_y)-1:int(start_y)+2] = 1
+
+        traversible = add_boundary(traversible)
+        goal_map = add_boundary(goal_map, value=0)
+
+        planner = FMMPlanner(traversible)
+
+        selem = skimage.morphology.disk(10)
+        goal_map = skimage.morphology.binary_dilation(
+            goal_map, selem) != True
+        goal_map = 1 - goal_map * 1.
+        planner.set_multi_goal(goal_map)
+
+        stg_x, stg_y, _, stop = planner.get_short_term_goal([start_x+1, start_y+1])
+        stg_x -= 1
+        stg_y -= 1
+
+        if stop and real_target:
+            action = 0
+        else:
+            angle_st_goal = math.degrees(math.atan2(stg_x - start_x,
+                                                    stg_y - start_y))
+            angle_agent = (start_o) % 360.0
+            if angle_agent > 180:
+                angle_agent -= 360
+
+            relative_angle = (angle_agent - angle_st_goal) % 360.0
+            if relative_angle > 180:
+                relative_angle -= 360
+
+            if relative_angle > self.args.turn_angle / 2.:
+                action = 3  # Right
+            elif relative_angle < -self.args.turn_angle / 2.:
+                action = 2  # Left
+            else:
+                action = 1  # Forward
+
+        self.last_action = action
+        self.prev_pos_m[0] = pose_m[0]
+        self.prev_pos_m[1] = pose_m[1]
+        self.prev_pos_m[2] = pose_m[2]
+        return action
