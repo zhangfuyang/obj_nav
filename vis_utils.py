@@ -4,7 +4,8 @@ import numpy as np
 from constants import obj_color_palette, region_color_palette, category2objectid, mp3d_region_id2name
 
 
-def visualization(img, semantic_map=None, agent_pose_m=None, arg=None, title="vis", goal_name='', width=1500):
+def visualization(img, semantic_map=None, agent_pose_m=None, goal_map=None,
+                  arg=None, title="vis", goal_name='', width=1500):
     '''
     Args:
         img: rgb
@@ -72,6 +73,10 @@ def visualization(img, semantic_map=None, agent_pose_m=None, arg=None, title="vi
             mask = sem_mask[mask_i]
             place = np.where(mask != 0)
             obj_semantic[place[0], place[1], :] = color
+        # draw goal map
+        if goal_map is not None:
+            place = np.where(goal_map > 0.1)
+            obj_semantic[place[0], place[1]] = np.array([0., 0., 255.])
         combine_feat.append(obj_semantic)
 
     if arg.use_region:

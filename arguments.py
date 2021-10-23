@@ -50,9 +50,8 @@ def get_args():
     parser.add_argument('--load', type=str, default="0",
                         help="""model path to load,
                                 0 to not reload (default: 0)""")
-    parser.add_argument('-v', '--visualize', type=int, default=2,
-                        help="""1: Render the observation and
-                                   the predicted semantic map,
+    parser.add_argument('-v', '--visualize', type=int, default=1,
+                        help="""1: Render the full visualization
                                 2: Render the observation with semantic
                                    predictions and the predicted semantic map
                                 (default: 0)""")

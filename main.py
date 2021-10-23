@@ -87,16 +87,16 @@ def main():
 
     for step in range(args.num_training_frames // args.num_processes + 1):
         step_time = time.time()
+        goal_map = []
         if args.agent_type != 'model':
+            goal_map.append(None)
             obs, reward, done, infos = \
                 envs.step([{'action': 0, } for _ in range(args.num_processes)])
         else:
             # use action to pass info
             real_target = []
-            goal_map = []
             for i in range(args.num_processes):
                 obj_map = semantic_map[i, infos[i]['goal_cat_id'] + 4].cpu().numpy()
-                print(obj_map.sum())
                 if obj_map.sum() <= 0:
                     real_target.append(False)
                     target_map = np.zeros_like(obj_map)
@@ -148,7 +148,7 @@ def main():
         for e in range(num_scenes):
             img = obs[e,:3].cpu().numpy().transpose(1,2,0)[...,::-1].astype(np.uint8)
             visualization(title='Thread {}'.format(e), goal_name=infos[e]['goal_name'],
-                          img=img, semantic_map=semantic_map[e],
+                          img=img, semantic_map=semantic_map[e], goal_map=goal_map[e],
                           agent_pose_m=agent_pose_m[e], arg=args)
 
         # ------------------------------------------------------------------
