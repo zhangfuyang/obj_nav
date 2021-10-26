@@ -104,6 +104,7 @@ def get_args():
                         help='learning rate (default: 2.5e-5)')
     parser.add_argument('--global_hidden_size', type=int, default=256,
                         help='global_hidden_size')
+    parser.add_argument('--image_down_sample', type=int, default=1)
     parser.add_argument('--eps', type=float, default=1e-5,
                         help='RL Optimizer epsilon (default: 1e-5)')
     parser.add_argument('--alpha', type=float, default=0.99,

@@ -9,6 +9,9 @@ from habitat import make_dataset
 
 from agents.our_agent import Our_Agent
 
+E_ = habitat.VectorEnv
+#E_ = habitat.ThreadedVectorEnv
+
 
 def make_env_fn(args, config_env, rank):
     dataset = make_dataset(config_env.DATASET.TYPE, config=config_env.DATASET)
@@ -130,7 +133,7 @@ def construct_envs(args):
 
         args_list.append(args)
 
-    VectorEnvClass = habitat.VectorEnv if args.num_processes > 1 else VectorSingleEnv
+    VectorEnvClass = E_ if args.num_processes > 1 else VectorSingleEnv
     envs = VectorEnvClass(
         make_env_fn=make_env_fn,
         env_fn_args=tuple(
@@ -143,7 +146,7 @@ def construct_envs(args):
     return envs
 
 
-class VectorSingleEnv(habitat.VectorEnv):
+class VectorSingleEnv(E_):
     r"""VectorEnv with single Env on main Process, avoiding IPC overheads."""
 
     def __init__(

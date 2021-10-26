@@ -122,8 +122,8 @@ class Our_Agent(habitat.RLEnv):
             self.gt_shortest_path = random.choice(shortest_paths)
 
         # preprocessing depth
-        for i in range(obs['depth'].shape[1]):
-            obs['depth'][:, i, 0][obs['depth'][:, i, 0] == 0.] = obs['depth'][:, i, 0].max()
+        #for i in range(obs['depth'].shape[1]):
+        #    obs['depth'][:, i, 0][obs['depth'][:, i, 0] == 0.] = obs['depth'][:, i, 0].max()
 
         # process obj semantic
         if self.args.use_obj:
@@ -244,8 +244,8 @@ class Our_Agent(habitat.RLEnv):
             self.info[key] = super_info[key]
         print('Thread {}, inner step fps:{:.2f}'.format(self.rank, 1/(time.time() - inner_step_time)))
         #preprocessing depth
-        for i in range(obs['depth'].shape[1]):
-            obs['depth'][:, i][obs['depth'][:, i] == 0.] = obs['depth'][:, i].max()
+        #for i in range(obs['depth'].shape[1]):
+        #    obs['depth'][:, i][obs['depth'][:, i] == 0.] = obs['depth'][:, i].max()
 
         self.timestep += 1
         self.trajectory_states.append(action)

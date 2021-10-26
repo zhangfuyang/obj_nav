@@ -2,6 +2,8 @@ import cv2
 import torch
 import numpy as np
 from constants import obj_color_palette, region_color_palette, category2objectid, mp3d_region_id2name
+import skimage.morphology
+import os
 
 
 def visualization(img, semantic_map=None, agent_pose_m=None, goal_map=None,
@@ -27,6 +29,8 @@ def visualization(img, semantic_map=None, agent_pose_m=None, goal_map=None,
         semantic_map = semantic_map.detach().cpu().numpy()
     if type(agent_pose_m) == torch.Tensor:
         agent_pose_m = agent_pose_m.detach().cpu().numpy()
+    if type(goal_map) == torch.Tensor:
+        goal_map = goal_map.detach().cpu().numpy()
 
     # draw explored map
     vis_semantic_map = (semantic_map[1] >= 0.1)[..., np.newaxis] * \
@@ -75,7 +79,9 @@ def visualization(img, semantic_map=None, agent_pose_m=None, goal_map=None,
             obj_semantic[place[0], place[1], :] = color
         # draw goal map
         if goal_map is not None:
-            place = np.where(goal_map > 0.1)
+            selem = skimage.morphology.disk(3)
+            goal_map_dilation = skimage.morphology.binary_dilation(goal_map, selem)
+            place = np.where(goal_map_dilation > 0.1)
             obj_semantic[place[0], place[1]] = np.array([0., 0., 255.])
         combine_feat.append(obj_semantic)
 
@@ -156,4 +162,12 @@ def visualization(img, semantic_map=None, agent_pose_m=None, goal_map=None,
     combined_vis = combined_vis[:,:,::-1]
     cv2.imshow(title, combined_vis / 255)
     cv2.waitKey(1)
+
+    #dump_dir = 'result'
+    #fn = '{}/episodes/{}/eps_{}/{}.png'.format(
+    #    dump_dir, title, episode_id, step)
+    #if os.path.exists('{}/episodes/{}/eps_{}'.format(dump_dir,title,episode_id)) is False:
+    #    os.makedirs('{}/episodes/{}/eps_{}'.format(dump_dir,title,episode_id), exist_ok=True)
+    #cv2.imwrite(fn, combined_vis)
+
     return

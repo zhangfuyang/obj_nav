@@ -123,10 +123,9 @@ class Semantic_Mapping(nn.Module):
         agent_view[:, 0:1, y1:y2, x1:x2] = fp_map_pred
         agent_view[:, 1:2, y1:y2, x1:x2] = fp_exp_pred
         agent_view[:, 4:4+self.num_sem_categories, y1:y2, x1:x2] = torch.clamp(
-            agent_height_proj[:, 1:, :, :] / self.cat_pred_threshold,
+            agent_height_proj[:, 1:1+self.num_sem_categories, :, :] / self.cat_pred_threshold,
             min=0.0, max=1.0)
 
-        #current_poses = get_new_pose_batch(poses_last, corrected_pose)
         current_poses = poses
         st_pose = current_poses.clone().detach()
 
@@ -143,7 +142,6 @@ class Semantic_Mapping(nn.Module):
         translated = F.grid_sample(rotated, trans_mat, align_corners=True)
 
         maps2 = torch.cat((maps_last.unsqueeze(1), translated.unsqueeze(1)), 1)
-
         map_pred, _ = torch.max(maps2, 1)
 
         # update agent location
