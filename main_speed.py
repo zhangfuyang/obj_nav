@@ -152,7 +152,7 @@ def construct_envs():
     basic_config.DATASET.SPLIT = 'val'
     basic_config.freeze()
 
-    VectorEnvClass = habitat.VectorEnv if num_processes else VectorSingleEnv
+    VectorEnvClass = habitat.VectorEnv if num_processes > 1 else VectorSingleEnv
 
     envs = VectorEnvClass(
         make_env_fn=make_env_fn,
